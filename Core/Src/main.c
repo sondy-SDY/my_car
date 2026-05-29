@@ -33,8 +33,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TRACE_LOST_STOP_MS   500U
-#define SEARCH_RAMP_MS       150U
+#define TRACE_CENTER_HOLD_SPEED 320
+#define TRACE_CURVE_SPEED 280
+#define TRACE_CURVE_ERROR 1.5f
+#define TRACE_SEARCH_SPIN_SPEED 250
 #define STARTUP_SETTLE_MS    200U
 
 /* USER CODE END PD */
@@ -48,7 +50,6 @@
 TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
-static uint32_t trace_lost_since = 0U;
 static uint8_t startup_done = 0U;
 
 /* USER CODE END PV */
@@ -141,79 +142,65 @@ int main(void)
 
     if (line_lost)
     {
-      float last_err = trace_get_last_error();
-      uint32_t now = HAL_GetTick();
+      float search_dir = trace_get_search_direction();
 
-      if (trace_lost_since == 0U)
+      // 丢线不停车：根据最后一次传感器方向原地旋转找线
+      // search_dir > 0 表示线最后在右侧，右转找回
+      // search_dir < 0 表示线最后在左侧，左转找回
+      if (search_dir >= 0.0f)
       {
-        trace_lost_since = now;
-      }
-
-      uint32_t lost_duration = now - trace_lost_since;
-
-      if (lost_duration >= TRACE_LOST_STOP_MS)
-      {
-        motor_stop();
-        pid_reset();
-        HAL_Delay(10);
-        continue;
-      }
-
-      // 渐进式搜索：速度随丢线时间增加
-      int16_t search_spd = (int16_t)(SEARCH_SPEED / 2);
-      if (lost_duration > SEARCH_RAMP_MS)
-      {
-        search_spd = SEARCH_SPEED;
-      }
-
-      if (last_err >= 0.0f)
-      {
-        motor_set(search_spd, -search_spd);
+        motor_set(TRACE_SEARCH_SPIN_SPEED, -TRACE_SEARCH_SPIN_SPEED);
       }
       else
       {
-        motor_set(-search_spd, search_spd);
+        motor_set(-TRACE_SEARCH_SPIN_SPEED, TRACE_SEARCH_SPIN_SPEED);
       }
       HAL_Delay(10);
       continue;
     }
 
-    trace_lost_since = 0U;
     calc_pid(error, line_lost);
 
     float abs_error = absf_local(error);
-    int16_t base_speed = (int16_t)(BASE_SPEED - (int16_t)(abs_error * TURN_SLOWDOWN));
 
-    if (trace->wide)
+    // 连续速度曲线：误差越大速度越低，无阶跃跳变
+    int16_t base_speed;
+    if (trace->uncertain)
     {
       base_speed = CROSS_SPEED;
     }
-    else if ((trace->count >= 3U) && (abs_error < 1.5f))
+    else if (trace->curve_hint || (abs_error >= TRACE_CURVE_ERROR))
     {
-      base_speed = MIN_RUN_SPEED;
+      base_speed = TRACE_CURVE_SPEED;
     }
-    else if (abs_error < 0.6f)
+    else if (trace->center_hold)
     {
-      base_speed = MAX_RUN_SPEED;
+      base_speed = TRACE_CENTER_HOLD_SPEED;
     }
-
-    if (base_speed < MIN_RUN_SPEED)
+    else if (trace->wide)
     {
-      base_speed = MIN_RUN_SPEED;
+      base_speed = CROSS_SPEED;
     }
-    if (base_speed > MAX_RUN_SPEED)
+    else
     {
-      base_speed = MAX_RUN_SPEED;
+      base_speed = (int16_t)(MAX_RUN_SPEED - (int16_t)(abs_error * TURN_SLOWDOWN));
+      if (base_speed < MIN_RUN_SPEED)
+      {
+        base_speed = MIN_RUN_SPEED;
+      }
+      if (base_speed > MAX_RUN_SPEED)
+      {
+        base_speed = MAX_RUN_SPEED;
+      }
     }
 
     float pid_out = get_pid_output();
     int16_t left  = (int16_t)(base_speed + (int16_t)pid_out);
     int16_t right = (int16_t)(base_speed - (int16_t)pid_out);
 
-    // 大误差时允许内侧轮反转实现原地转弯
-    int16_t reverse_limit = (abs_error > 3.0f) ? (int16_t)(-SEARCH_SPEED) : 0;
-    left  = clamp_i16(left,  reverse_limit, PWM_MAX);
-    right = clamp_i16(right, reverse_limit, PWM_MAX);
+    // 正常循迹不允许反转，内侧轮最低为0
+    left  = clamp_i16(left,  0, PWM_MAX);
+    right = clamp_i16(right, 0, PWM_MAX);
 
     motor_set(left, right);
 
