@@ -195,6 +195,18 @@ static uint8_t normalize_trace_mask(uint8_t mask, uint8_t raw_mask,
         return centered_mask;
     }
 
+    // 有真实的非中心读数(如内侧 S2/S5、外侧 S1/S6 亮)：直接放行真实加权误差，
+    // 不再用固定 BLEND(±2) 或 CENTER(0) 覆盖。这是修复急弯欠转露线的关键——
+    // 线偏到 S1/S6 时误差应为 ±5，旧逻辑却把它钉死在 ±2，转向力只有真实值的40%。
+    if (mask != 0U) {
+        if (count_black_groups(mask) >= 2U) {
+            *uncertain = 1U;
+        }
+        return mask;
+    }
+
+    // 以下分支仅在当前帧滤波掩码完全为空(线落在传感器缝隙)时生效，
+    // 用历史提示维持上一次的转向方向/居中，避免立刻判丢线。
     if ((turn_hint == 1U) && (last_error <= TRACE_CENTER_HOLD_ERROR_LIMIT)) {
         *center_hold = 1U;
         return TRACE_LEFT_BLEND_MASK;
@@ -209,10 +221,6 @@ static uint8_t normalize_trace_mask(uint8_t mask, uint8_t raw_mask,
          ((raw_mask & TRACE_CENTER_MASK) != 0U))) {
         *center_hold = 1U;
         return TRACE_CENTER_MASK;
-    }
-
-    if (count_black_groups(mask) >= 2U) {
-        *uncertain = 1U;
     }
 
     return mask;
@@ -310,7 +318,8 @@ float trace_get_error(void) {
     // 记录最后一次非居中方向用于丢线原地搜索
     if (new_error > 0.5f) {
         last_search_direction = 1.0f;
-    } else if (new_error < -0.5f) {
+    } else if (new_error < -2.0f) {
+        // 只有明显偏左才切换到左转搜索，避免轻微左偏覆盖默认右转
         last_search_direction = -1.0f;
     } else {
         uint8_t search_mask = (uint8_t)(mask | raw_mask);

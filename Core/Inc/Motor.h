@@ -16,13 +16,13 @@
 
 // PWM parameters
 #define PWM_MAX       999
-#define BASE_SPEED    400
-#define MAX_RUN_SPEED 420
-#define MIN_RUN_SPEED 280
-#define CROSS_SPEED   300
-#define TURN_SLOWDOWN 35
+#define BASE_SPEED    360
+#define MAX_RUN_SPEED 440   // 直道速度
+#define MIN_RUN_SPEED 0     // 转弯内轮可停到0，一轮定住另一轮转
+#define CROSS_SPEED   260
+#define TURN_SLOWDOWN 30    // 降低斜率，直道判定范围更宽，速度更稳
 #define SEARCH_SPEED  320
-#define MOTOR_PWM_STEP 100
+#define MOTOR_PWM_STEP 300  // 加快差速建立
 
 // Open-loop trim for motors without encoders. Tune these on a straight line.
 #define LEFT_TRIM   0

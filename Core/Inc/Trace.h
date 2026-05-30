@@ -43,17 +43,21 @@ typedef struct {
 } TraceState;
 
 // 多级确认：过采样 + 积分迟滞 + 候选状态连续确认
-#define TRACE_FILTER_MAX       5U
+// 注意：主循环周期由 10ms 改为 5ms(200Hz)后，下列"按周期计"的窗口
+// 已相应加倍以保持实际毫秒时长不变(纯提升控制分辨率，不改变保持/丢线行为)。
+// 唯一例外是 TRACE_FILTER_MAX，有意调小以加快边缘位释放、减少过弯露线。
+#define TRACE_FILTER_MAX       4U   // 3→4: 迟滞更厚，单帧误读不够累积到置位
 #define TRACE_FILTER_ON_LEVEL  2U
 #define TRACE_FILTER_OFF_LEVEL 0U
-#define TRACE_CONFIRM_CYCLES   2U
-#define TRACE_LOST_HOLD_CYCLES 6U
-#define TRACE_CENTER_HOLD_CYCLES 7U
-#define TRACE_CURVE_HINT_CYCLES 3U
+#define TRACE_CONFIRM_CYCLES   4U   // 2→4: 配合 5ms 周期，确认时长保持 ~20ms
+#define TRACE_LOST_HOLD_CYCLES 10U  // 50ms 内用 last_error 差速滑行，普通弯道不触发自转
+#define TRACE_CENTER_HOLD_CYCLES 6U  // 降低保持时间，减少中间灯闪烁影响
+#define TRACE_CURVE_HINT_CYCLES 1U  // 内侧灯灭后立刻解除弯道提示，不影响直道速度
 
-// 单次调用内多次采样取多数 (抗瞬态干扰)
-#define TRACE_OVERSAMPLE       5U
-#define TRACE_OVERSAMPLE_ON_VOTES 2U
+// 单次调用内多次采样取多数 (抗瞬态干扰/褶皱反光)
+// 9次采样需5票才置位，褶皱短暂反光难以凑够多数
+#define TRACE_OVERSAMPLE       9U
+#define TRACE_OVERSAMPLE_ON_VOTES 5U
 
 // 中间两路闪烁时宁可迟钝一点，也不要立刻按边缘误判转弯
 #define TRACE_CENTER_HOLD_ERROR_LIMIT 1.5f
