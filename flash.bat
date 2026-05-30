@@ -11,7 +11,7 @@ if %errorlevel% neq 0 (
 echo 正在使用OpenOCD烧录固件...
 
 rem 执行烧录命令
-openocd -f openocd.cfg -c "program build/Debug/VS_Led_test.elf verify reset exit"
+openocd -f openocd.cfg -c "program build/Debug/STM32_LineFollower_Car.elf verify reset exit"
 
 if %errorlevel% neq 0 (
     echo 烧录失败！

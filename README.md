@@ -66,7 +66,7 @@ PWM 计数周期为 `999`，软件中速度范围为 `-999 ~ 999`。正负号表
 │       └── PID.c        # PID 控制器
 ├── Drivers              # STM32 HAL / CMSIS 驱动
 ├── cmake                # CMake 工具链和 CubeMX 构建配置
-├── VS_Led_test.ioc      # STM32CubeMX 工程配置
+├── STM32_LineFollower_Car.ioc  # STM32CubeMX 工程配置
 ├── openocd.cfg          # OpenOCD 烧录配置
 ├── flash.bat            # Windows 下 OpenOCD 烧录脚本
 └── CMakePresets.json    # Debug / Release 构建预设
@@ -155,10 +155,10 @@ cmake --build --preset Release
 常见输出路径：
 
 ```text
-build/Debug/VS_Led_test.elf
-build/Debug/VS_Led_test.hex
-build/Release/VS_Led_test.elf
-build/Release/VS_Led_test.hex
+build/Debug/STM32_LineFollower_Car.elf
+build/Debug/STM32_LineFollower_Car.hex
+build/Release/STM32_LineFollower_Car.elf
+build/Release/STM32_LineFollower_Car.hex
 ```
 
 ## 烧录
@@ -172,13 +172,13 @@ flash.bat
 也可以直接使用 OpenOCD：
 
 ```bash
-openocd -f openocd.cfg -c "program build/Debug/VS_Led_test.elf verify reset exit"
+openocd -f openocd.cfg -c "program build/Debug/STM32_LineFollower_Car.elf verify reset exit"
 ```
 
 如果使用 Release 固件，请把路径改为：
 
 ```bash
-openocd -f openocd.cfg -c "program build/Release/VS_Led_test.elf verify reset exit"
+openocd -f openocd.cfg -c "program build/Release/STM32_LineFollower_Car.elf verify reset exit"
 ```
 
 ## 调试和调参建议
